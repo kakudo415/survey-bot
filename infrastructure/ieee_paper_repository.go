@@ -106,11 +106,9 @@ func (r *IEEEPaperRepository) extractAuthors(doc *goquery.Document) []string {
 }
 
 func (r *IEEEPaperRepository) extractPublishedAt(doc *goquery.Document) time.Time {
-	// IEEE Xploreの日付形式に合わせて抽出
 	dateText := doc.Find(".doc-abstract-pubdate").Text()
 	dateText = strings.TrimSpace(strings.Replace(dateText, "Date of Publication:", "", 1))
 	
-	// 基本的な日付パースを試行
 	formats := []string{
 		"02 January 2006",
 		"January 2006",
@@ -129,7 +127,6 @@ func (r *IEEEPaperRepository) extractPublishedAt(doc *goquery.Document) time.Tim
 func (r *IEEEPaperRepository) extractContent(doc *goquery.Document) string {
 	var content strings.Builder
 	
-	// Abstract
 	abstract := doc.Find(".abstract-text").Text()
 	if abstract != "" {
 		content.WriteString("Abstract: ")
@@ -137,7 +134,6 @@ func (r *IEEEPaperRepository) extractContent(doc *goquery.Document) string {
 		content.WriteString("\n\n")
 	}
 	
-	// Keywords
 	keywords := doc.Find(".doc-keywords").Text()
 	if keywords != "" {
 		content.WriteString("Keywords: ")

@@ -28,7 +28,7 @@ func main() {
 
 	openaiModel := os.Getenv("OPENAI_MODEL")
 	if openaiModel == "" {
-		openaiModel = "gpt-3.5-turbo"
+		openaiModel = "gpt-4.1"
 	}
 
 	targetChannelID := os.Getenv("TARGET_CHANNEL_ID")

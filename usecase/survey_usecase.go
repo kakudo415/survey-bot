@@ -20,13 +20,11 @@ func NewSurveyUseCase(paperRepo domain.PaperRepository, summaryService domain.Su
 }
 
 func (uc *SurveyUseCase) ProcessPaper(ctx context.Context, paperURL string) (*domain.Paper, *domain.Summary, error) {
-	// 論文情報を取得
 	paper, err := uc.paperRepo.FindByURL(ctx, paperURL)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to fetch paper: %w", err)
 	}
 
-	// 要約を生成
 	summary, err := uc.summaryService.GenerateSummary(ctx, paper)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to generate summary: %w", err)
