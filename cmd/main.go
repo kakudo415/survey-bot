@@ -11,7 +11,6 @@ import (
 )
 
 func main() {
-	// 環境変数の取得
 	slackBotToken := os.Getenv("SLACK_BOT_TOKEN")
 	if slackBotToken == "" {
 		log.Fatal("SLACK_BOT_TOKEN environment variable is required")
@@ -27,6 +26,11 @@ func main() {
 		log.Fatal("OPENAI_API_KEY environment variable is required")
 	}
 
+	openaiModel := os.Getenv("OPENAI_MODEL")
+	if openaiModel == "" {
+		openaiModel = "gpt-3.5-turbo"
+	}
+
 	targetChannelID := os.Getenv("TARGET_CHANNEL_ID")
 	if targetChannelID == "" {
 		log.Fatal("TARGET_CHANNEL_ID environment variable is required")
@@ -37,19 +41,15 @@ func main() {
 		port = "8080"
 	}
 
-	// 依存性注入
 	paperRepo := infrastructure.NewIEEEPaperRepository()
-	summaryService := infrastructure.NewOpenAISummaryService(openaiAPIKey)
+	summaryService := infrastructure.NewOpenAISummaryService(openaiAPIKey, openaiModel)
 	slackClient := infrastructure.NewSlackClient(slackBotToken)
 
 	surveyUseCase := usecase.NewSurveyUseCase(paperRepo, summaryService)
 	eventHandler := usecase.NewSlackEventHandler(surveyUseCase, slackClient, targetChannelID)
 	controller := presentation.NewSlackEventController(eventHandler, slackSigningSecret)
 
-	// HTTPサーバーのセットアップ
 	http.HandleFunc("/slack/events", controller.HandleSlackEvent)
-	
-	// ヘルスチェック用エンドポイント
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/kakudo415/survey-bot/domain"
+	"github.com/slack-go/slack/slackevents"
 )
 
 type SlackEventHandler struct {
@@ -20,20 +21,6 @@ type SlackClient interface {
 	PostEphemeralError(ctx context.Context, channel, user, errorMsg string) error
 }
 
-type SlackEvent struct {
-	Type      string `json:"type"`
-	Challenge string `json:"challenge,omitempty"`
-	Event     *Event `json:"event,omitempty"`
-}
-
-type Event struct {
-	Type      string `json:"type"`
-	Channel   string `json:"channel"`
-	User      string `json:"user"`
-	Text      string `json:"text"`
-	Timestamp string `json:"ts"`
-	ThreadTS  string `json:"thread_ts,omitempty"`
-}
 
 func NewSlackEventHandler(surveyUseCase *SurveyUseCase, slackClient SlackClient, targetChannelID string) *SlackEventHandler {
 	return &SlackEventHandler{
@@ -43,44 +30,43 @@ func NewSlackEventHandler(surveyUseCase *SurveyUseCase, slackClient SlackClient,
 	}
 }
 
-func (h *SlackEventHandler) HandleEvent(ctx context.Context, event SlackEvent) error {
-	// URL verification challenge
-	if event.Type == "url_verification" {
-		return nil // challenge response is handled in controller
+func (h *SlackEventHandler) HandleEvent(ctx context.Context, event slackevents.EventsAPIInnerEvent) error {
+	if event.Type != "message" {
+		return nil
 	}
 
-	// メッセージイベントでない場合はスキップ
-	if event.Event == nil || event.Event.Type != "message" {
+	messageEvent, ok := event.Data.(*slackevents.MessageEvent)
+	if !ok {
 		return nil
 	}
 
 	// 対象チャンネル以外はスキップ
-	if event.Event.Channel != h.targetChannelID {
+	if messageEvent.Channel != h.targetChannelID {
 		return nil
 	}
 
 	// Bot自身のメッセージはスキップ
-	if event.Event.User == "" {
+	if messageEvent.User == "" {
 		return nil
 	}
 
 	// スレッドメッセージはスキップ（元メッセージのみ処理）
-	if event.Event.ThreadTS != "" {
+	if messageEvent.ThreadTimeStamp != "" {
 		return nil
 	}
 
 	// URLを抽出
-	urls := h.extractURLs(event.Event.Text)
+	urls := h.extractURLs(messageEvent.Text)
 	if len(urls) == 0 {
 		return nil
 	}
 
 	// 各URLを処理
 	for _, url := range urls {
-		if err := h.processURL(ctx, url, event.Event); err != nil {
+		if err := h.processURL(ctx, url, messageEvent); err != nil {
 			log.Printf("Failed to process URL %s: %v", url, err)
 			// エラーをEphemeral messageで通知
-			if err := h.slackClient.PostEphemeralError(ctx, event.Event.Channel, event.Event.User, err.Error()); err != nil {
+			if err := h.slackClient.PostEphemeralError(ctx, messageEvent.Channel, messageEvent.User, err.Error()); err != nil {
 				log.Printf("Failed to post ephemeral error: %v", err)
 			}
 		}
@@ -89,14 +75,14 @@ func (h *SlackEventHandler) HandleEvent(ctx context.Context, event SlackEvent) e
 	return nil
 }
 
-func (h *SlackEventHandler) processURL(ctx context.Context, url string, event *Event) error {
+func (h *SlackEventHandler) processURL(ctx context.Context, url string, event *slackevents.MessageEvent) error {
 	paper, summary, err := h.surveyUseCase.ProcessPaper(ctx, url)
 	if err != nil {
 		return err
 	}
 
 	// スレッドに要約を投稿
-	return h.slackClient.PostMessageToThread(ctx, event.Channel, event.Timestamp, paper, summary)
+	return h.slackClient.PostMessageToThread(ctx, event.Channel, event.TimeStamp, paper, summary)
 }
 
 func (h *SlackEventHandler) extractURLs(text string) []string {

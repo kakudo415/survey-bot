@@ -3,22 +3,29 @@ package infrastructure
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/kakudo415/survey-bot/domain"
 )
 
+//go:embed prompts/system_prompt.txt
+var systemPrompt string
+
 type OpenAISummaryService struct {
 	apiKey string
+	model  string
 	client *http.Client
 }
 
-func NewOpenAISummaryService(apiKey string) *OpenAISummaryService {
+func NewOpenAISummaryService(apiKey, model string) *OpenAISummaryService {
 	return &OpenAISummaryService{
 		apiKey: apiKey,
+		model:  model,
 		client: &http.Client{
 			Timeout: 60 * time.Second,
 		},
@@ -51,11 +58,11 @@ func (s *OpenAISummaryService) GenerateSummary(ctx context.Context, paper *domai
 	prompt := s.buildPrompt(paper)
 	
 	reqBody := openAIRequest{
-		Model: "gpt-3.5-turbo",
+		Model: s.model,
 		Messages: []message{
 			{
 				Role:    "system",
-				Content: "あなたは学術論文の要約を作成する専門家です。論文の内容を日本語で分かりやすく要約してください。",
+				Content: strings.TrimSpace(systemPrompt),
 			},
 			{
 				Role:    "user",
